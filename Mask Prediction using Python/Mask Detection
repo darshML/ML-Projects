@@ -1,0 +1,114 @@
+! pip install kaggle
+! mkdir ~/.kaggle
+! cp kaggle.json ~/.kaggle/
+! chmod 600 ~/.kaggle/kaggle.json
+
+! kaggle datasets download ashishjangra27/face-mask-12k-images-dataset
+
+
+
+!unzip /content/face-mask-12k-images-dataset.zip
+
+from matplotlib import pyplot
+from matplotlib.image import imread
+import matplotlib.pyplot as plt
+
+"""# Load Dataset"""
+
+#Load train and test set
+train_dir = '/content/Face Mask Dataset/Train'
+test_dir = '/content/Face Mask Dataset/Test'
+val_dir = '/content/Face Mask Dataset/Validation'
+
+img = '/content/Face Mask Dataset/Test/WithMask/1163.png'
+image = imread(img)
+pyplot.imshow(image)
+pyplot.show()
+
+image.shape
+
+img = '/content/Face Mask Dataset/Test/WithMask/1174.png'
+image = imread(img)
+pyplot.imshow(image)
+pyplot.show()
+
+image.shape
+
+from keras.preprocessing.image import ImageDataGenerator
+from keras.applications.inception_v3 import preprocess_input
+
+train_datagen=ImageDataGenerator(preprocessing_function=preprocess_input) 
+
+train_generator=train_datagen.flow_from_directory(train_dir,
+                                                 target_size=(224,224),
+                                                 color_mode='rgb',
+                                                 batch_size=32,
+                                                 class_mode='categorical',
+                                                 shuffle=True)
+
+test_datagen=ImageDataGenerator(preprocessing_function=preprocess_input) 
+
+test_generator=test_datagen.flow_from_directory(test_dir,
+                                                 target_size=(224,224),
+                                                 color_mode='rgb',
+                                                 batch_size=32,
+                                                 class_mode='categorical',
+                                                 shuffle=True)
+
+val_datagen=ImageDataGenerator(preprocessing_function=preprocess_input) 
+
+val_generator=test_datagen.flow_from_directory(val_dir,
+                                                 target_size=(224,224),
+                                                 color_mode='rgb',
+                                                 batch_size=32,
+                                                 class_mode='categorical',
+                                                 shuffle=True)
+
+from keras.applications.vgg19 import VGG19
+from keras.layers import Dense,GlobalAveragePooling2D,Flatten, Dropout
+
+from tensorflow.keras.applications import VGG19
+base_model= VGG19(weights = 'imagenet', 
+                 include_top = False, 
+                 input_shape = (224, 224, 3))
+
+x1=base_model.output
+x1=GlobalAveragePooling2D()(x1)
+x1=Dense(64,activation='relu')(x1) 
+x1=Dropout(0.5)(x1)
+preds=Dense(2,activation='softmax')(x1)
+
+from keras.models import Model
+model=Model(inputs=base_model.input,outputs=preds)
+
+for layer in model.layers[:20]:
+    layer.trainable=False
+for layer in model.layers[20:]:
+    layer.trainable=True
+
+model.compile(optimizer='Adam',loss='categorical_crossentropy',metrics=['accuracy'])
+EPOCHS=20
+
+history = model.fit_generator(generator=train_generator,
+                              steps_per_epoch=len(train_generator)//32,
+                              epochs=EPOCHS,validation_data=val_generator,
+                              validation_steps=len(val_generator)//32)
+
+model.evaluate_generator(test_generator)
+
+"""# Testing on Sample
+
+"""
+
+sample_img = cv2.imread('/content/Face Mask Dataset/Test/WithMask/10.png')
+sample_img = cv2.resize(sample_img,(224,224))
+plt.imshow(sample_img)
+sample_mask_img = np.reshape(sample_mask_img,[1,224,224,3])
+sample_mask_img = sample_mask_img/255.0
+
+model.predict(sample_mask_img)
+
+"""# Save Model"""
+
+model.save('vgg19_net.h5')
+
